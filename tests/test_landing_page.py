@@ -1,5 +1,7 @@
 from playwright.sync_api import Page, expect
 from lib.database_connection import *
+from lib.user import User
+from lib.user_repository import UserRepository
 
 def test_has_welcome_title(page: Page):
     page.goto("http://127.0.0.1:5001")
@@ -20,16 +22,23 @@ def test_new_book_added_to_list(page: Page):
     connection.connect()
     connection.seed("./seeds/books.sql")
 
-    page.goto("http://127.0.0.1:5001/books")
+    user_repository = UserRepository(connection)
+    user_repository.create(User(username="user", password="pword"))
 
+    page.goto("http://127.0.0.1:5001/sessions/new")
+    page.get_by_label("Username").fill("user")
+    page.get_by_label("Password").fill("pword")
+    page.get_by_role("button", name="Sign Up").click()
+
+    page.goto("http://127.0.0.1:5001/books")
     page.get_by_label("Title").fill("title")
     page.get_by_label("Author").fill("author")
-    page.get_by_role("button", name="Submit").click()
 
-    books_list = page.locator("ul > li")
+    with page.expect_navigation():
+        page.get_by_role("button", name="Submit").click()
 
-    assert books_list.all_inner_texts()[4] == "title by author"
-
+    expect(page.locator("ul > li")).to_contain_text(["title by author"])
+    
 def test_has_books_list(page: Page):
     connection = DatabaseConnection()
     connection.connect()
